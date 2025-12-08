@@ -1,9 +1,1 @@
-[
-  {
-    "id": "16085d53-aa55-4795-9581-9c564f18e2ee",
-    "direction": "IN",
-    "protocol": "ICMP",
-    "port": null,
-    "type": "AllowRule"
-  }
-]
+[]

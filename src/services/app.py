@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import platform
 from typing import Dict, Type
 
 from rich.markup import escape
@@ -37,11 +36,9 @@ class FirewallApp(App):
     def __init__(self) -> None:
         super().__init__()
         self.manager = FirewallManager(JsonDatabase.get_instance())
-        self._os_name = platform.system()
 
     def compose(self) -> ComposeResult:
-        os_indicator = "🐧" if self._os_name == "Linux" else "🪟" if self._os_name == "Windows" else "💻"
-        yield Static(f"phoque - firewall TUI {os_indicator} ({self._os_name})", id="banner")
+        yield Static("phoque - firewall TUI", id="banner")
         yield RuleTable(id="rules_table")
         yield RichLog(id="log", highlight=False, markup=True, wrap=False)
         yield Static(
@@ -53,8 +50,7 @@ class FirewallApp(App):
     def on_mount(self) -> None:
         self.refresh_rules()
         self.query_one(RuleTable).focus_table()
-        backend_info = "iptables" if self._os_name == "Linux" else "netsh advfirewall" if self._os_name == "Windows" else "unknown"
-        self._log(f"Backend: {backend_info}. Use [a]/[d]/[p]/[q]; navigate with arrow keys.")
+        self._log("Backend: iptables. Use [a]/[d]/[p]/[q]; navigate with arrow keys.")
 
     def refresh_rules(self) -> None:
         table = self.query_one("#rules_table", RuleTable)
@@ -185,10 +181,7 @@ class FirewallApp(App):
             commands = self.manager.apply_configuration(execute=True)
         except CommandExecutionError as exc:
             self._log(f"Apply failed: {exc.stderr}", severity="error")
-            if self._os_name == "Windows":
-                self._log("Hint: Run as Administrator for Windows Firewall changes.", severity="warning")
-            elif self._os_name == "Linux":
-                self._log("Hint: Run with sudo for iptables changes.", severity="warning")
+            self._log("Hint: Run with sudo for iptables changes.", severity="warning")
             return
         if not commands:
             self._log("No rules to apply", severity="info")
