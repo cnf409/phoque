@@ -44,7 +44,7 @@ class FirewallApp(App):
         yield RuleTable(id="rules_table")
         yield RichLog(id="log", highlight=False, markup=True, wrap=False)
         yield Static(
-            "Shortcuts: [a]dd, [e]dit, [d]elete, [x] toggle, [p] apply, [t] focus table, [q] quit.",
+            "Shortcuts: [a]dd, [e]dit, [d]elete, [x] toggle, [p] toggle all, [t] focus table, [q] quit.",
             id="help",
             markup=False,
         )
@@ -52,7 +52,7 @@ class FirewallApp(App):
     def on_mount(self) -> None:
         self.refresh_rules()
         self.query_one(RuleTable).focus_table()
-        self._log("Use [a]/[e]/[d]/[p]/[t]/[q]; navigate with arrow keys.")
+        self._log("Use [a]/[e]/[d]/[x]/[p]/[t]/[q]; navigate with arrow keys.")
 
     def refresh_rules(self) -> None:
         table = self.query_one("#rules_table", RuleTable)
@@ -120,13 +120,12 @@ class FirewallApp(App):
         table.update_rules(self.manager.rules)
         state = "activated" if rule.active else "deactivated"
         self._log(f"Rule {state}", severity="info")
-        if rule.active and not previous_state:
-            # Apply immediately when enabling to avoid mismatch between displayed state and system
-            try:
-                commands = self.manager.apply_configuration(execute=True)
-                self._log(f"Applied {len(commands)} rule(s)", severity="success")
-            except CommandExecutionError as exc:
-                self._log(f"Apply failed: {exc.stderr}", severity="error")
+        # Apply immediately to reflect state change on system
+        try:
+            commands = self.manager.apply_configuration(execute=True)
+            self._log(f"Applied {len(commands)} rule(s)", severity="success")
+        except CommandExecutionError as exc:
+            self._log(f"Apply failed: {exc.stderr}", severity="error")
 
     def _handle_rule_creation(self, event: RuleForm.Submitted | None) -> None:
         if event is None:
@@ -207,13 +206,22 @@ class FirewallApp(App):
             self._log("Deletion cancelled", severity="info")
 
     def _apply_rules(self) -> None:
+        if any(not rule.active for rule in self.manager.rules):
+            new_state = True
+            action_label = "activated"
+        else:
+            new_state = False
+            action_label = "deactivated"
+
+        for rule in self.manager.rules:
+            rule.active = new_state
+        self.manager.db.save(self.manager.rules)
+        self.refresh_rules()
+
         try:
             commands = self.manager.apply_configuration(execute=True)
         except CommandExecutionError as exc:
             self._log(f"Apply failed: {exc.stderr}", severity="error")
             self._log("Hint: Run with sudo for iptables changes.", severity="warning")
             return
-        if not commands:
-            self._log("No rules to apply", severity="info")
-        else:
-            self._log(f"{len(commands)} rule(s) applied", severity="success")
+        self._log(f"All rules {action_label} and applied ({len(commands)} command(s))", severity="success")
