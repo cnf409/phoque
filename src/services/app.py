@@ -51,7 +51,7 @@ class FirewallApp(App):
     def on_mount(self) -> None:
         self.refresh_rules()
         self.query_one(RuleTable).focus_table()
-        self._log("Backend: iptables. Use [a]/[d]/[p]/[q]; navigate with arrow keys.")
+        self._log("Use [a]/[e]/[d]/[p]/[t]/[q]; navigate with arrow keys.")
 
     def refresh_rules(self) -> None:
         table = self.query_one("#rules_table", RuleTable)
