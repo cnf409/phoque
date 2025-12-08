@@ -1,80 +1,50 @@
-# phoque - Easy TUI Firewall
+# phoque - keyboard-only TUI firewall
 
-## Project Description:
-TUI firewall much like UFW, easy to use and to setup
+A lightweight Textual TUI that wraps iptables/nftables-like rules with a simple keyboard workflow (add/delete/apply). Rules are tagged so re-applying cleans up previous state.
 
-## Diagram:
-```cpp
-classDiagram
-    class IDatabaseService {
-        <<Interface>>
-        +save(rules: List~Rule~)
-        +load() List~Rule~
-    }
+## Features
+- Add/drop/reject rules on INPUT/OUTPUT/FORWARD with TCP/UDP/ICMP.
+- Wildcard (`*`) or range (`1000-2000`) ports for TCP/UDP.
+- JSON persistence (`data/rules.json`), auto-clean before apply via rule comments.
+- Pure keyboard: shortcuts and modal dialogs, no mouse needed.
 
-    class JsonDatabase {
-        <<Singleton>>
-        -static instance: JsonDatabase
-        -file_path: str
-        -JsonDatabase()
-        +get_instance() JsonDatabase$
-        +save(rules: List~Rule~)
-        +load() List~Rule~
-    }
+## Requirements
+- Python 3.10+
+- `textual` (see `requirements.txt`)
+- Root or `cap_net_admin` on the Python binary to run iptables.
 
-    class Rule {
-        <<Abstract>>
-        +UUID id
-        +Direction direction
-        +Protocol protocol
-        +int port
-        +get_command() str*
-    }
-
-    class AllowRule {
-        +get_command() str
-    }
-
-    class DenyRule {
-        +get_command() str
-    }
-
-    class RejectRule {
-        +get_command() str
-    }
-
-    class Direction {
-        <<enumeration>>
-        IN
-        OUT
-        FORWARD
-    }
-    class Protocol {
-        <<enumeration>>
-        TCP
-        UDP
-        ICMP
-    }
-
-    class FirewallManager {
-        -List~Rule~ rules
-        -IDatabaseService db
-        +add_rule(Rule rule)
-        +remove_rule(uuid)
-        +apply_configuration()
-    }
-
-    %% --- Relations ---
-    JsonDatabase --|> IDatabaseService : implements
-    IDatabaseService ..> Rule : manages
-
-    AllowRule --|> Rule : inherits
-    DenyRule --|> Rule : inherits
-    RejectRule --|> Rule : inherits
-
-    Rule ..> Direction
-    Rule ..> Protocol
-
-    FirewallManager --> IDatabaseService : uses
-    FirewallManager o-- Rule : aggregates
+## Setup
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
+
+## Run
+```bash
+# recommend root or setcap to let iptables succeed
+sudo -E .venv/bin/python src/domain/main.py
+```
+
+## Shortcuts
+- `[a]` add rule (↑/↓ select, Tab move, Enter submit, Esc cancel)
+- `[d]` delete selected rule (y/n confirm)
+- `[p]` apply current rules (cleans previous tagged rules, then reapplies)
+- `[t]` focus table
+- `[q]` quit
+
+## Rule inputs
+- Action: Accept / Drop / Reject
+- Direction: IN / OUT / FORWARD
+- Protocol: TCP / UDP / ICMP
+- Port (TCP/UDP): number (80), wildcard `*`, or range `1000-2000` (or `1000:2000`). ICMP ignores port.
+
+## Notes on permissions
+- iptables needs root. Either run with `sudo -E .venv/bin/python src/domain/main.py` or give caps:  
+  `sudo setcap cap_net_admin,cap_net_raw=eip .venv/bin/python3`
+
+## Data
+- Rules are stored in `data/rules.json`. Tagged rules use comment `phoque-<id>` for cleanup on apply.
+
+## UML diagram
+See `diagramme_uml.png` for the domain architecture (Rule hierarchy, manager, storage).
