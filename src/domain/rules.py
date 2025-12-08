@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Type
+from typing import Dict, Optional, Type, Union
 from uuid import UUID, uuid4
 
 from .types import Direction, Protocol
@@ -12,14 +12,18 @@ from .types import Direction, Protocol
 class Rule(ABC):
     direction: Direction
     protocol: Protocol
-    port: Optional[int] = None
+    port: Optional[str] = None
     id: UUID = field(default_factory=uuid4)
 
     def __post_init__(self) -> None:
-        if self.protocol != Protocol.ICMP and self.port is None:
-            raise ValueError("Port is required for TCP and UDP rules")
-        if self.port is not None and not 0 < self.port <= 65535:
-            raise ValueError("Port must be between 1 and 65535")
+        if self.protocol != Protocol.ICMP:
+            if self.port is None:
+                raise ValueError("Port is required for TCP and UDP rules")
+            self.port = self._normalize_port(self.port)
+        else:
+            if self.port is not None and self.port != "*":
+                # ICMP ignores port, but allow "*" for consistency.
+                self.port = None
 
     @property
     def type_name(self) -> str:
@@ -41,8 +45,8 @@ class Rule(ABC):
             "-p",
             self.protocol.cli_value,
         ]
-        if self.protocol != Protocol.ICMP and self.port is not None:
-            parts += ["--dport", str(self.port)]
+        if self.protocol != Protocol.ICMP and self.port not in (None, "*"):
+            parts += ["--dport", self._format_port_for_cli(self.port)]
         parts += ["-m", "comment", "--comment", self.comment]
         parts += ["-j", target]
         return " ".join(parts)
@@ -74,9 +78,39 @@ class Rule(ABC):
         return rule_cls(
             direction=Direction(data["direction"]),
             protocol=Protocol(data["protocol"]),
-            port=int(port_value) if port_value is not None else None,
+            port=str(port_value) if port_value is not None else None,
             id=UUID(data["id"]),
         )
+
+    def _normalize_port(self, port: Union[str, int]) -> str:
+        if isinstance(port, int):
+            if not 0 < port <= 65535:
+                raise ValueError("Port must be between 1 and 65535")
+            return str(port)
+        value = str(port).strip()
+        if value == "*":
+            return "*"
+        if "-" in value or ":" in value:
+            sep = "-" if "-" in value else ":"
+            start_str, end_str = value.split(sep, 1)
+            try:
+                start = int(start_str)
+                end = int(end_str)
+            except ValueError:
+                raise ValueError("Port range must be numeric, e.g. 1000-2000")
+            if not (0 < start <= 65535 and 0 < end <= 65535 and start <= end):
+                raise ValueError("Port range must be between 1 and 65535 and start<=end")
+            return f"{start}:{end}"
+        try:
+            numeric = int(value)
+        except ValueError:
+            raise ValueError("Port must be an integer, range (start-end), or '*'")
+        if not 0 < numeric <= 65535:
+            raise ValueError("Port must be between 1 and 65535")
+        return str(numeric)
+
+    def _format_port_for_cli(self, port: str) -> str:
+        return port.replace("-", ":")
 
 
 class AllowRule(Rule):

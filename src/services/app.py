@@ -36,7 +36,7 @@ class FirewallApp(App):
         self.manager = FirewallManager(JsonDatabase.get_instance())
 
     def compose(self) -> ComposeResult:
-        yield Static("phoque - firewall TUI (keyboard only)", id="banner")
+        yield Static("phoque - firewall TUI", id="banner")
         yield RuleTable(id="rules_table")
         yield RichLog(id="log", highlight=False, markup=False, wrap=False)
         yield Static(
@@ -83,7 +83,7 @@ class FirewallApp(App):
         action_raw = event.action
         direction_raw = event.direction.value
         protocol_raw = event.protocol.value
-        port_raw = str(event.port) if event.port is not None else None
+        port_raw = event.port if event.port is not None else None
 
         action_map: Dict[str, Type[Rule]] = {
             "allow": AllowRule,
@@ -107,16 +107,13 @@ class FirewallApp(App):
             self._log("Invalid protocol (tcp/udp/icmp)", severity="warning")
             return
 
-        port: int | None = None
         if protocol != Protocol.ICMP:
             if port_raw is None:
                 self._log("Port required for TCP/UDP", severity="warning")
                 return
-            try:
-                port = int(port_raw)
-            except ValueError:
-                self._log("Port must be an integer", severity="warning")
-                return
+            port = port_raw
+        else:
+            port = None
 
         try:
             rule = rule_cls(direction=direction, protocol=protocol, port=port)

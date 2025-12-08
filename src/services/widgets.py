@@ -16,7 +16,7 @@ from domain.types import Direction, Protocol
 
 class RuleForm(Static):
     class Submitted(Message):
-        def __init__(self, action: str, direction: Direction, protocol: Protocol, port: Optional[int]) -> None:
+        def __init__(self, action: str, direction: Direction, protocol: Protocol, port: Optional[str]) -> None:
             super().__init__()
             self.action = action
             self.direction = direction
@@ -88,11 +88,15 @@ class RuleForm(Static):
         protocol = Protocol((protocol_select.highlighted_option or protocol_select.get_option_at_index(0)).id)
 
         port_value = port_input.value.strip()
-        port: Optional[int] = None
+        port: Optional[str] = None
         if port_value:
-            try:
-                port = int(port_value)
-            except ValueError:
+            if port_value == "*":
+                port = "*"
+            elif "-" in port_value or ":" in port_value:
+                port = port_value
+            elif port_value.isdigit():
+                port = port_value
+            else:
                 port = None
 
         self.post_message(RuleForm.Submitted(action, direction, protocol, port))
