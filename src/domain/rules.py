@@ -120,24 +120,27 @@ class AllowRule(Rule):
     def get_command(self) -> str:
         return self._build_command("ACCEPT")
 
-    def get_delete_command(self) -> str:
-        return super().get_delete_command("ACCEPT")
+    def get_delete_command(self, target: str | None = None) -> str:
+        resolved = target or "ACCEPT"
+        return super().get_delete_command(resolved)
 
 
 class DenyRule(Rule):
     def get_command(self) -> str:
         return self._build_command("DROP")
 
-    def get_delete_command(self) -> str:
-        return super().get_delete_command("DROP")
+    def get_delete_command(self, target: str | None = None) -> str:
+        resolved = target or "DROP"
+        return super().get_delete_command(resolved)
 
 
 class RejectRule(Rule):
     def get_command(self) -> str:
         return self._build_command("REJECT")
 
-    def get_delete_command(self) -> str:
-        return super().get_delete_command("REJECT")
+    def get_delete_command(self, target: str | None = None) -> str:
+        resolved = target or "REJECT"
+        return super().get_delete_command(resolved)
 
 
 _RULE_TYPES: Dict[str, Type[Rule]] = {

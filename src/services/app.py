@@ -183,11 +183,14 @@ class FirewallApp(App):
             else:
                 self._log("Rule not found for update", severity="warning")
         else:
+            # New rules start inactive; let user toggle/apply explicitly.
+            rule.active = False
             self.manager.add_rule(rule)
             self.refresh_rules()
             self._log(
                 f"Added: {rule.type_name} {rule.direction.value} {rule.protocol.value}"
-                + (f" port {rule.port}" if rule.port else ""),
+                + (f" port {rule.port}" if rule.port else "")
+                + " (inactive by default)",
                 severity="info",
             )
 

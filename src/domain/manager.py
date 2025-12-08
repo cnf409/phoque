@@ -47,10 +47,12 @@ class FirewallManager:
                 return rule
         return None
 
-    def remove_rule(self, rule_id: str | UUID) -> bool:
+    def remove_rule(self, rule_id: str | UUID, runner: Optional[Callable[[str], None]] = None) -> bool:
         normalized = str(rule_id)
         for idx, rule in enumerate(self.rules):
             if str(rule.id) == normalized:
+                # De-apply before removal
+                self._deapply_rule(rule, runner)
                 del self.rules[idx]
                 self.db.save(self.rules)
                 return True
@@ -112,3 +114,18 @@ class FirewallManager:
                 delete_cmd = line.replace("-A", "-D", 1)
                 full_cmd = f"iptables {delete_cmd}"
                 self._run_command(full_cmd, runner, ignore_errors=True)
+
+    def _deapply_rule(
+        self,
+        rule: Rule,
+        runner: Optional[Callable[[str], None]] = None,
+    ) -> None:
+        # Remove rule from all chains it could have been applied to.
+        target_map = {
+            "ALLOW": "ACCEPT",
+            "DENY": "DROP",
+            "REJECT": "REJECT",
+        }
+        target = target_map.get(rule.type_name, "DROP")
+        delete_cmd = rule.get_delete_command(target)
+        self._run_command(delete_cmd, runner, ignore_errors=True)
