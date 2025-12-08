@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.message import Message
@@ -57,6 +58,21 @@ class RuleForm(Static):
     def on_mount(self) -> None:
         self._highlight_defaults()
         self.query_one("#action", OptionList).focus()
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        event.stop()
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "enter":
+            event.stop()
+            self.action_submit()
+        elif event.key == "escape":
+            event.stop()
+            self.action_cancel()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        event.stop()
+        self.action_submit()
 
     def action_cancel(self) -> None:
         self.post_message(RuleForm.Cancelled())
