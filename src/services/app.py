@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Type
 
+from rich.markup import escape
 from textual.app import App, ComposeResult
 from textual.widgets import RichLog, Static
 
@@ -27,6 +28,7 @@ class FirewallApp(App):
         ("q", "quit", "Quitter"),
         ("a", "add_rule", "Ajouter"),
         ("d", "delete_rule", "Supprimer"),
+        ("e", "edit_rule", "Editer"),
         ("p", "apply_rules", "Appliquer"),
         ("t", "focus_table", "Focus table"),
     ]
@@ -40,7 +42,7 @@ class FirewallApp(App):
         yield RuleTable(id="rules_table")
         yield RichLog(id="log", highlight=False, markup=True, wrap=False)
         yield Static(
-            "Shortcuts: [a]dd, [d]elete, [p] apply, [t] focus table, [q] quit.",
+            "Shortcuts: [a]dd, [e]dit, [d]elete, [p] apply, [t] focus table, [q] quit.",
             id="help",
             markup=False,
         )
@@ -63,7 +65,7 @@ class FirewallApp(App):
         }
         color = colors.get(severity, "plum1")
         log = self.query_one("#log", RichLog)
-        log.write(f"[{color}]{message}[/{color}]")
+        log.write(f"[{color}]{escape(message)}[/{color}]")
 
     def action_add_rule(self) -> None:
         self._log("Add rule: ↑/↓ to pick, Tab to move, Enter to submit, Esc to cancel.", severity="info")
@@ -83,6 +85,18 @@ class FirewallApp(App):
 
     def action_apply_rules(self) -> None:
         self._apply_rules()
+
+    def action_edit_rule(self) -> None:
+        table = self.query_one("#rules_table", RuleTable)
+        selected_id = table.get_selected_rule_id()
+        if not selected_id:
+            self._log("No rule selected", severity="warning")
+            return
+        rule = self.manager.get_rule(selected_id)
+        if not rule:
+            self._log("Rule not found", severity="warning")
+            return
+        self.push_screen(AddRuleScreen(initial_rule=rule), self._handle_rule_creation)
 
     def _handle_rule_creation(self, event: RuleForm.Submitted | None) -> None:
         if event is None:
@@ -128,13 +142,25 @@ class FirewallApp(App):
             self._log(str(exc), severity="warning")
             return
 
-        self.manager.add_rule(rule)
-        self.refresh_rules()
-        self._log(
-            f"Added: {rule.type_name} {rule.direction.value} {rule.protocol.value}"
-            + (f" port {rule.port}" if rule.port else ""),
-            severity="info",
-        )
+        if event.rule_id:
+            updated = self.manager.update_rule(event.rule_id, rule)
+            if updated:
+                self.refresh_rules()
+                self._log(
+                    f"Updated: {rule.type_name} {rule.direction.value} {rule.protocol.value}"
+                    + (f" port {rule.port}" if rule.port else ""),
+                    severity="success",
+                )
+            else:
+                self._log("Rule not found for update", severity="warning")
+        else:
+            self.manager.add_rule(rule)
+            self.refresh_rules()
+            self._log(
+                f"Added: {rule.type_name} {rule.direction.value} {rule.protocol.value}"
+                + (f" port {rule.port}" if rule.port else ""),
+                severity="info",
+            )
 
     def _remove_rule(self, rule_id: str) -> None:
         removed = self.manager.remove_rule(rule_id)

@@ -29,6 +29,23 @@ class FirewallManager:
         self.rules.append(rule)
         self.db.save(self.rules)
 
+    def update_rule(self, rule_id: str | UUID, new_rule: Rule) -> bool:
+        normalized = str(rule_id)
+        for idx, rule in enumerate(self.rules):
+            if str(rule.id) == normalized:
+                new_rule.id = rule.id
+                self.rules[idx] = new_rule
+                self.db.save(self.rules)
+                return True
+        return False
+
+    def get_rule(self, rule_id: str | UUID) -> Optional[Rule]:
+        normalized = str(rule_id)
+        for rule in self.rules:
+            if str(rule.id) == normalized:
+                return rule
+        return None
+
     def remove_rule(self, rule_id: str | UUID) -> bool:
         normalized = str(rule_id)
         for idx, rule in enumerate(self.rules):

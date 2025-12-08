@@ -16,12 +16,20 @@ from domain.types import Direction, Protocol
 
 class RuleForm(Static):
     class Submitted(Message):
-        def __init__(self, action: str, direction: Direction, protocol: Protocol, port: Optional[str]) -> None:
+        def __init__(
+            self,
+            action: str,
+            direction: Direction,
+            protocol: Protocol,
+            port: Optional[str],
+            rule_id: Optional[str] = None,
+        ) -> None:
             super().__init__()
             self.action = action
             self.direction = direction
             self.protocol = protocol
             self.port = port
+            self.rule_id = rule_id
 
     class Cancelled(Message):
         pass
@@ -38,8 +46,13 @@ class RuleForm(Static):
     }
     """
 
+    def __init__(self, initial_rule: Optional[Rule] = None, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.initial_rule = initial_rule
+
     def compose(self) -> ComposeResult:
-        yield Static("Add rule (↑/↓ to choose, Tab to move, Enter to submit, Esc to cancel)")
+        title = "Edit rule" if self.initial_rule else "Add rule"
+        yield Static(f"{title} (↑/↓ to choose, Tab to move, Enter to submit, Esc to cancel)")
         yield OptionList(Option("Accept", "allow"), Option("Drop", "deny"), Option("Reject", "reject"), id="action")
         yield OptionList(
             Option(Direction.IN.value, Direction.IN.value),
@@ -99,19 +112,48 @@ class RuleForm(Static):
             else:
                 port = None
 
-        self.post_message(RuleForm.Submitted(action, direction, protocol, port))
+        rule_id = str(self.initial_rule.id) if self.initial_rule else None
+        self.post_message(RuleForm.Submitted(action, direction, protocol, port, rule_id=rule_id))
 
     def _highlight_defaults(self) -> None:
-        for opt_list in ["action", "direction", "protocol"]:
+        defaults = {
+            "action": None,
+            "direction": None,
+            "protocol": None,
+            "port": "",
+        }
+        if self.initial_rule:
+            defaults["action"] = self.initial_rule.type_name.lower()
+            defaults["direction"] = self.initial_rule.direction.value
+            defaults["protocol"] = self.initial_rule.protocol.value
+            defaults["port"] = self.initial_rule.port or ""
+
+        for opt_list, value in [
+            ("action", defaults["action"]),
+            ("direction", defaults["direction"]),
+            ("protocol", defaults["protocol"]),
+        ]:
             widget = self.query_one(f"#{opt_list}", OptionList)
+            if value:
+                for idx, option in enumerate(widget.options):
+                    if option.id.lower() == value.lower():
+                        widget.highlighted = idx
+                        break
             if widget.highlighted is None and widget.option_count:
                 widget.highlighted = 0
 
+        port_input = self.query_one("#port", Input)
+        port_input.value = defaults["port"]
+
 
 class AddRuleScreen(ModalScreen[Optional[RuleForm.Submitted]]):
+    def __init__(self, initial_rule: Optional[Rule] = None) -> None:
+        super().__init__()
+        self.initial_rule = initial_rule
+
     def compose(self) -> ComposeResult:
         yield Vertical(
-            RuleForm(id="rule_form"),
+            RuleForm(id="rule_form", initial_rule=self.initial_rule),
             Static("Tab to navigate, Enter to submit, Esc to cancel."),
         )
 
