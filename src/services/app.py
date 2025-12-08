@@ -43,11 +43,7 @@ class FirewallApp(App):
         yield Static("phoque - firewall TUI", id="banner")
         yield RuleTable(id="rules_table")
         yield RichLog(id="log", highlight=False, markup=True, wrap=False)
-        yield Static(
-            "Shortcuts: [a]dd, [e]dit, [d]elete, [x] toggle, [p] toggle all, [t] focus table, [q] quit.",
-            id="help",
-            markup=False,
-        )
+        yield Static("", id="help", markup=False)
 
     def on_mount(self) -> None:
         self.refresh_rules()
@@ -57,6 +53,15 @@ class FirewallApp(App):
     def refresh_rules(self) -> None:
         table = self.query_one("#rules_table", RuleTable)
         table.update_rules(self.manager.rules)
+        self._update_help_text()
+
+    def _update_help_text(self) -> None:
+        label = self._toggle_all_label()
+        help_text = (
+            f"Shortcuts: [a]dd, [e]dit, [d]elete, [x] toggle, [p] {label}, "
+            "[t] focus table, [q] quit."
+        )
+        self.query_one("#help", Static).update(help_text)
 
     def _log(self, message: str, severity: str = "info") -> None:
         colors = {
@@ -209,15 +214,28 @@ class FirewallApp(App):
             self._log("Deletion cancelled", severity="info")
 
     def _apply_rules(self) -> None:
-        if any(not rule.active for rule in self.manager.rules):
-            new_state = True
+        if not self.manager.rules:
+            self._log("No rules to toggle", severity="warning")
+            return
+
+        actives = [rule.active for rule in self.manager.rules]
+        if all(actives):
+            # All active -> deactivate all
+            for rule in self.manager.rules:
+                rule.active = False
+            action_label = "deactivated"
+        elif all(not state for state in actives):
+            # All inactive -> activate all
+            for rule in self.manager.rules:
+                rule.active = True
             action_label = "activated"
         else:
-            new_state = False
-            action_label = "deactivated"
+            # Mixed -> activate only the inactive ones
+            for rule in self.manager.rules:
+                if not rule.active:
+                    rule.active = True
+            action_label = "activated (remaining)"
 
-        for rule in self.manager.rules:
-            rule.active = new_state
         self.manager.db.save(self.manager.rules)
         self.refresh_rules()
 
@@ -228,3 +246,13 @@ class FirewallApp(App):
             self._log("Hint: Run with sudo for iptables changes.", severity="warning")
             return
         self._log(f"All rules {action_label} and applied ({len(commands)} command(s))", severity="success")
+
+    def _toggle_all_label(self) -> str:
+        if not self.manager.rules:
+            return "toggle all"
+        actives = [rule.active for rule in self.manager.rules]
+        if all(actives):
+            return "untoggle all"
+        if all(not state for state in actives):
+            return "toggle all"
+        return "toggle remaining"
