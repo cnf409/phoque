@@ -34,6 +34,7 @@ class FirewallManager:
         for idx, rule in enumerate(self.rules):
             if str(rule.id) == normalized:
                 new_rule.id = rule.id
+                new_rule.active = rule.active
                 self.rules[idx] = new_rule
                 self.db.save(self.rules)
                 return True
@@ -60,7 +61,7 @@ class FirewallManager:
         execute: bool = True,
         runner: Optional[Callable[[str], None]] = None,
     ) -> List[str]:
-        commands = [rule.get_command() for rule in self.rules]
+        commands = [rule.get_command() for rule in self.rules if rule.active]
         if not execute:
             return commands
 

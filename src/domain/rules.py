@@ -13,6 +13,7 @@ class Rule(ABC):
     direction: Direction
     protocol: Protocol
     port: Optional[str] = None
+    active: bool = True
     id: UUID = field(default_factory=uuid4)
 
     def __post_init__(self) -> None:
@@ -65,6 +66,7 @@ class Rule(ABC):
             "direction": self.direction.value,
             "protocol": self.protocol.value,
             "port": self.port,
+            "active": self.active,
             "type": self.__class__.__name__,
         }
 
@@ -79,6 +81,7 @@ class Rule(ABC):
             direction=Direction(data["direction"]),
             protocol=Protocol(data["protocol"]),
             port=str(port_value) if port_value is not None else None,
+            active=bool(data.get("active", True)),
             id=UUID(data["id"]),
         )
 

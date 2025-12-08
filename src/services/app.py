@@ -32,6 +32,7 @@ class FirewallApp(App):
         ("p", "apply_rules", "Appliquer"),
         ("t", "focus_table", "Focus table"),
         ("ctrl+c", "force_quit", "Quit (no prompt)"),
+        ("x", "toggle_rule", "Toggle"),
     ]
 
     def __init__(self) -> None:
@@ -43,7 +44,7 @@ class FirewallApp(App):
         yield RuleTable(id="rules_table")
         yield RichLog(id="log", highlight=False, markup=True, wrap=False)
         yield Static(
-            "Shortcuts: [a]dd, [e]dit, [d]elete, [p] apply, [t] focus table, [q] quit.",
+            "Shortcuts: [a]dd, [e]dit, [d]elete, [x] toggle, [p] apply, [t] focus table, [q] quit.",
             id="help",
             markup=False,
         )
@@ -102,6 +103,30 @@ class FirewallApp(App):
             self._log("Rule not found", severity="warning")
             return
         self.push_screen(AddRuleScreen(initial_rule=rule), self._handle_rule_creation)
+
+    def action_toggle_rule(self) -> None:
+        table = self.query_one("#rules_table", RuleTable)
+        selected_id = table.get_selected_rule_id()
+        if not selected_id:
+            self._log("No rule selected", severity="warning")
+            return
+        rule = self.manager.get_rule(selected_id)
+        if not rule:
+            self._log("Rule not found", severity="warning")
+            return
+        previous_state = rule.active
+        rule.active = not rule.active
+        self.manager.db.save(self.manager.rules)
+        table.update_rules(self.manager.rules)
+        state = "activated" if rule.active else "deactivated"
+        self._log(f"Rule {state}", severity="info")
+        if rule.active and not previous_state:
+            # Apply immediately when enabling to avoid mismatch between displayed state and system
+            try:
+                commands = self.manager.apply_configuration(execute=True)
+                self._log(f"Applied {len(commands)} rule(s)", severity="success")
+            except CommandExecutionError as exc:
+                self._log(f"Apply failed: {exc.stderr}", severity="error")
 
     def _handle_rule_creation(self, event: RuleForm.Submitted | None) -> None:
         if event is None:

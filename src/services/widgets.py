@@ -221,19 +221,21 @@ class RuleTable(Static):
         self.table = DataTable(zebra_stripes=True)
 
     def compose(self) -> ComposeResult:
-        self.table.add_columns("ID", "Action", "Direction", "Protocol", "Port")
+        self.table.add_columns("ID", "Action", "Direction", "Protocol", "Port", "Active")
         yield self.table
 
     def update_rules(self, rules: List[Rule]) -> None:
         self.table.clear(columns=False)
         self._row_keys = []
         for rule in rules:
+            active_label = "[green]ON[/green]" if rule.active else "[red]OFF[/red]"
             self.table.add_row(
                 rule.short_id,
                 rule.type_name,
                 rule.direction.value,
                 rule.protocol.value,
                 rule.port if rule.port is not None else "-",
+                active_label,
             )
             self._row_keys.append(str(rule.id))
         if self.table.row_count:
