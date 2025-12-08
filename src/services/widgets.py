@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
+from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
@@ -53,6 +54,26 @@ class RuleForm(Static):
     def compose(self) -> ComposeResult:
         title = "Edit rule" if self.initial_rule else "Add rule"
         yield Static(f"{title} (↑/↓ to choose, Tab to move, Enter to submit, Esc to cancel)")
+        if self.initial_rule:
+            action_map = {
+                "ALLOW": "#4ade80",  # green
+                "DROP": "#facc15",   # yellow
+                "REJECT": "#ef4444", # red
+            }
+            action_color = action_map.get(self.initial_rule.type_name.upper(), "sky_blue3")
+            summary = Text()
+            summary.append("ID: ", style="bold")
+            summary.append(self.initial_rule.short_id, style="sky_blue3 bold")
+            summary.append("  ")
+            summary.append("Current: ", style="bold")
+            summary.append(self.initial_rule.type_name, style=action_color)
+            summary.append(" ")
+            summary.append(self.initial_rule.direction.value, style="sky_blue3")
+            summary.append(" ")
+            summary.append(self.initial_rule.protocol.value, style="sky_blue3")
+            if self.initial_rule.port:
+                summary.append(f" {self.initial_rule.port}", style="sky_blue3")
+            yield Static(summary, classes="hint", markup=False)
         yield OptionList(Option("Accept", "allow"), Option("Drop", "deny"), Option("Reject", "reject"), id="action")
         yield OptionList(
             Option(Direction.IN.value, Direction.IN.value),
