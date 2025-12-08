@@ -31,6 +31,7 @@ class FirewallApp(App):
         ("e", "edit_rule", "Editer"),
         ("p", "apply_rules", "Appliquer"),
         ("t", "focus_table", "Focus table"),
+        ("ctrl+c", "force_quit", "Quit (no prompt)"),
     ]
 
     def __init__(self) -> None:
@@ -85,6 +86,10 @@ class FirewallApp(App):
 
     def action_apply_rules(self) -> None:
         self._apply_rules()
+
+    def action_force_quit(self) -> None:
+        # Exit immediately without the Textual confirmation dialog.
+        self.exit()
 
     def action_edit_rule(self) -> None:
         table = self.query_one("#rules_table", RuleTable)
