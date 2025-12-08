@@ -19,7 +19,7 @@ class FirewallApp(App):
     }
     #banner { padding: 0 1; }
     #rules_table { height: 1fr; }
-    #log { height: 5; border: solid #2f2f2f; padding: 0 1; }
+    #log { height: 10; border: solid #2f2f2f; padding: 0 1; }
     #help { color: #8a8a8a; padding: 0 1; }
     """
 
@@ -38,7 +38,7 @@ class FirewallApp(App):
     def compose(self) -> ComposeResult:
         yield Static("phoque - firewall TUI", id="banner")
         yield RuleTable(id="rules_table")
-        yield RichLog(id="log", highlight=False, markup=False, wrap=False)
+        yield RichLog(id="log", highlight=False, markup=True, wrap=False)
         yield Static(
             "Shortcuts: [a]dd, [d]elete, [p] apply, [t] focus table, [q] quit.",
             id="help",
@@ -55,8 +55,15 @@ class FirewallApp(App):
         table.update_rules(self.manager.rules)
 
     def _log(self, message: str, severity: str = "info") -> None:
+        colors = {
+            "info": "sky_blue3",
+            "warning": "yellow1",
+            "error": "red1",
+            "success": "spring_green3",
+        }
+        color = colors.get(severity, "plum1")
         log = self.query_one("#log", RichLog)
-        log.write(message)
+        log.write(f"[{color}]{message}[/{color}]")
 
     def action_add_rule(self) -> None:
         self._log("Add rule: ↑/↓ to pick, Tab to move, Enter to submit, Esc to cancel.", severity="info")
@@ -133,7 +140,7 @@ class FirewallApp(App):
         removed = self.manager.remove_rule(rule_id)
         if removed:
             self.refresh_rules()
-            self._log("Rule deleted", severity="info")
+            self._log("Rule deleted", severity="success")
         else:
             self._log("Rule not found", severity="warning")
 
