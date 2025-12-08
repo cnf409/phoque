@@ -29,12 +29,27 @@ class Rule(ABC):
     def short_id(self) -> str:
         return str(self.id).split("-")[0]
 
+    @property
+    def comment(self) -> str:
+        return f"phoque-{self.short_id}"
+
     def _build_command(self, target: str) -> str:
-        parts = ["iptables", "-A", self.direction.chain, "-p", self.protocol.cli_value]
+        parts = [
+            "iptables",
+            "-A",
+            self.direction.chain,
+            "-p",
+            self.protocol.cli_value,
+        ]
         if self.protocol != Protocol.ICMP and self.port is not None:
             parts += ["--dport", str(self.port)]
+        parts += ["-m", "comment", "--comment", self.comment]
         parts += ["-j", target]
         return " ".join(parts)
+
+    def get_delete_command(self, target: str) -> str:
+        # Switch append to delete; keep the same match criteria.
+        return self._build_command(target).replace("iptables -A", "iptables -D", 1)
 
     @abstractmethod
     def get_command(self) -> str:
@@ -68,15 +83,24 @@ class AllowRule(Rule):
     def get_command(self) -> str:
         return self._build_command("ACCEPT")
 
+    def get_delete_command(self) -> str:
+        return super().get_delete_command("ACCEPT")
+
 
 class DenyRule(Rule):
     def get_command(self) -> str:
         return self._build_command("DROP")
 
+    def get_delete_command(self) -> str:
+        return super().get_delete_command("DROP")
+
 
 class RejectRule(Rule):
     def get_command(self) -> str:
         return self._build_command("REJECT")
+
+    def get_delete_command(self) -> str:
+        return super().get_delete_command("REJECT")
 
 
 _RULE_TYPES: Dict[str, Type[Rule]] = {

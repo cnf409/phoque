@@ -47,6 +47,8 @@ class FirewallManager:
         if not execute:
             return commands
 
+        # Remove any previously applied rules tagged by this tool before re-applying.
+        self._cleanup_existing_rules(runner=runner)
         for command in commands:
             self._run_command(command, runner)
         return commands
@@ -55,6 +57,7 @@ class FirewallManager:
         self,
         command: str,
         runner: Optional[Callable[[str], None]] = None,
+        ignore_errors: bool = False,
     ) -> None:
         if runner:
             runner(command)
@@ -67,4 +70,30 @@ class FirewallManager:
             text=True,
         )
         if completed.returncode != 0:
+            if ignore_errors:
+                return
             raise CommandExecutionError(command, completed.stderr.strip())
+
+    def _cleanup_existing_rules(
+        self,
+        runner: Optional[Callable[[str], None]] = None,
+    ) -> None:
+        for chain in ("INPUT", "OUTPUT", "FORWARD"):
+            list_cmd = f"iptables -S {chain}"
+            completed = subprocess.run(
+                shlex.split(list_cmd),
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if completed.returncode != 0:
+                # If we cannot list rules, skip cleanup for this chain.
+                continue
+            for line in completed.stdout.splitlines():
+                if 'comment "phoque-' not in line and "comment phoque-" not in line:
+                    continue
+                if not line.startswith("-A"):
+                    continue
+                delete_cmd = line.replace("-A", "-D", 1)
+                full_cmd = f"iptables {delete_cmd}"
+                self._run_command(full_cmd, runner, ignore_errors=True)
