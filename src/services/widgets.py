@@ -23,6 +23,7 @@ class RuleForm(Static):
             direction: Direction,
             protocol: Protocol,
             port: Optional[str],
+            interface: Optional[str],
             rule_id: Optional[str] = None,
         ) -> None:
             super().__init__()
@@ -30,6 +31,7 @@ class RuleForm(Static):
             self.direction = direction
             self.protocol = protocol
             self.port = port
+            self.interface = interface
             self.rule_id = rule_id
 
     class Cancelled(Message):
@@ -73,6 +75,8 @@ class RuleForm(Static):
             summary.append(self.initial_rule.protocol.value, style="sky_blue3")
             if self.initial_rule.port:
                 summary.append(f" {self.initial_rule.port}", style="sky_blue3")
+            if self.initial_rule.interface:
+                summary.append(f" [{self.initial_rule.interface}]", style="sky_blue3")
             yield Static(summary, classes="hint", markup=False)
         yield OptionList(Option("Accept", "allow"), Option("Drop", "deny"), Option("Reject", "reject"), id="action")
         yield OptionList(
@@ -88,6 +92,7 @@ class RuleForm(Static):
             id="protocol",
         )
         yield Input(placeholder="Port (empty for ICMP)", id="port")
+        yield Input(placeholder="Interface (optional, e.g. eth0)", id="interface")
 
     def on_mount(self) -> None:
         self._highlight_defaults()
@@ -116,6 +121,7 @@ class RuleForm(Static):
         direction_select = self.query_one("#direction", OptionList)
         protocol_select = self.query_one("#protocol", OptionList)
         port_input = self.query_one("#port", Input)
+        iface_input = self.query_one("#interface", Input)
 
         action = (action_select.highlighted_option or action_select.get_option_at_index(0)).id.lower()
         direction = Direction((direction_select.highlighted_option or direction_select.get_option_at_index(0)).id)
@@ -133,8 +139,11 @@ class RuleForm(Static):
             else:
                 port = None
 
+        interface_value = iface_input.value.strip()
+        interface = interface_value or None
+
         rule_id = str(self.initial_rule.id) if self.initial_rule else None
-        self.post_message(RuleForm.Submitted(action, direction, protocol, port, rule_id=rule_id))
+        self.post_message(RuleForm.Submitted(action, direction, protocol, port, interface, rule_id=rule_id))
 
     def _highlight_defaults(self) -> None:
         defaults = {
@@ -142,12 +151,14 @@ class RuleForm(Static):
             "direction": None,
             "protocol": None,
             "port": "",
+            "interface": "",
         }
         if self.initial_rule:
             defaults["action"] = self.initial_rule.type_name.lower()
             defaults["direction"] = self.initial_rule.direction.value
             defaults["protocol"] = self.initial_rule.protocol.value
             defaults["port"] = self.initial_rule.port or ""
+            defaults["interface"] = self.initial_rule.interface or ""
 
         for opt_list, value in [
             ("action", defaults["action"]),
@@ -165,6 +176,8 @@ class RuleForm(Static):
 
         port_input = self.query_one("#port", Input)
         port_input.value = defaults["port"]
+        iface_input = self.query_one("#interface", Input)
+        iface_input.value = defaults["interface"]
 
 
 class AddRuleScreen(ModalScreen[Optional[RuleForm.Submitted]]):
@@ -221,7 +234,7 @@ class RuleTable(Static):
         self.table = DataTable(zebra_stripes=True)
 
     def compose(self) -> ComposeResult:
-        self.table.add_columns("ID", "Action", "Direction", "Protocol", "Port", "Active")
+        self.table.add_columns("ID", "Action", "Direction", "Protocol", "Port", "Iface", "Active")
         yield self.table
 
     def update_rules(self, rules: List[Rule]) -> None:
@@ -235,6 +248,7 @@ class RuleTable(Static):
                 rule.direction.value,
                 rule.protocol.value,
                 rule.port if rule.port is not None else "-",
+                rule.interface or "-",
                 active_label,
             )
             self._row_keys.append(str(rule.id))

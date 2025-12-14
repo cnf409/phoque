@@ -139,6 +139,7 @@ class FirewallApp(App):
         direction_raw = event.direction.value
         protocol_raw = event.protocol.value
         port_raw = event.port if event.port is not None else None
+        interface_raw = event.interface if event.interface else None
 
         action_map: Dict[str, Type[Rule]] = {
             "allow": AllowRule,
@@ -171,7 +172,7 @@ class FirewallApp(App):
             port = None
 
         try:
-            rule = rule_cls(direction=direction, protocol=protocol, port=port)
+            rule = rule_cls(direction=direction, protocol=protocol, port=port, interface=interface_raw)
         except ValueError as exc:
             self._log(str(exc), severity="warning")
             return
@@ -180,9 +181,10 @@ class FirewallApp(App):
             updated = self.manager.update_rule(event.rule_id, rule)
             if updated:
                 self.refresh_rules()
+                iface_part = f" iface {rule.interface}" if rule.interface else ""
+                port_part = f" port {rule.port}" if rule.port else ""
                 self._log(
-                    f"Updated: {rule.type_name} {rule.direction.value} {rule.protocol.value}"
-                    + (f" port {rule.port}" if rule.port else ""),
+                    f"Updated: {rule.type_name} {rule.direction.value} {rule.protocol.value}{port_part}{iface_part}",
                     severity="success",
                 )
             else:
@@ -192,9 +194,11 @@ class FirewallApp(App):
             rule.active = False
             self.manager.add_rule(rule)
             self.refresh_rules()
+            iface_part = f" iface {rule.interface}" if rule.interface else ""
             self._log(
                 f"Added: {rule.type_name} {rule.direction.value} {rule.protocol.value}"
                 + (f" port {rule.port}" if rule.port else "")
+                + iface_part
                 + " (inactive by default)",
                 severity="info",
             )

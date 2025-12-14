@@ -13,10 +13,13 @@ class Rule(ABC):
     direction: Direction
     protocol: Protocol
     port: Optional[str] = None
+    interface: Optional[str] = None
     active: bool = True
     id: UUID = field(default_factory=uuid4)
 
     def __post_init__(self) -> None:
+        if self.interface is not None:
+            self.interface = self.interface.strip() or None
         if self.protocol != Protocol.ICMP:
             if self.port is None:
                 raise ValueError("Port is required for TCP and UDP rules")
@@ -46,6 +49,10 @@ class Rule(ABC):
             "-p",
             self.protocol.cli_value,
         ]
+        if self.interface:
+            # Use -i for incoming/forward traffic, -o for outgoing.
+            iface_flag = "-o" if self.direction == Direction.OUT else "-i"
+            parts += [iface_flag, self.interface]
         if self.protocol != Protocol.ICMP and self.port not in (None, "*"):
             parts += ["--dport", self._format_port_for_cli(self.port)]
         parts += ["-m", "comment", "--comment", self.comment]
@@ -66,6 +73,7 @@ class Rule(ABC):
             "direction": self.direction.value,
             "protocol": self.protocol.value,
             "port": self.port,
+            "interface": self.interface,
             "active": self.active,
             "type": self.__class__.__name__,
         }
@@ -77,10 +85,12 @@ class Rule(ABC):
         if not rule_cls:
             raise ValueError(f"Unknown rule type: {rule_type}")
         port_value = data.get("port")
+        interface_value = data.get("interface")
         return rule_cls(
             direction=Direction(data["direction"]),
             protocol=Protocol(data["protocol"]),
             port=str(port_value) if port_value is not None else None,
+            interface=str(interface_value) if interface_value else None,
             active=bool(data.get("active", True)),
             id=UUID(data["id"]),
         )
