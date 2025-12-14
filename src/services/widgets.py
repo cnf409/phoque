@@ -54,6 +54,7 @@ class RuleForm(Static):
         self.initial_rule = initial_rule
 
     def compose(self) -> ComposeResult:
+        """Build the add/edit form with action/direction/protocol/port/interface controls."""
         title = "Edit rule" if self.initial_rule else "Add rule"
         yield Static(f"{title} (↑/↓ to choose, Tab to move, Enter to submit, Esc to cancel)")
         if self.initial_rule:
@@ -102,6 +103,7 @@ class RuleForm(Static):
         event.stop()
 
     def on_key(self, event: events.Key) -> None:
+        """Handle Enter/Esc manually to avoid relying on focus state."""
         if event.key == "enter":
             event.stop()
             self.action_submit()
@@ -117,6 +119,7 @@ class RuleForm(Static):
         self.post_message(RuleForm.Cancelled())
 
     def action_submit(self) -> None:
+        """Collect the current selections and emit a Submitted message."""
         action_select = self.query_one("#action", OptionList)
         direction_select = self.query_one("#direction", OptionList)
         protocol_select = self.query_one("#protocol", OptionList)
@@ -186,6 +189,7 @@ class AddRuleScreen(ModalScreen[Optional[RuleForm.Submitted]]):
         self.initial_rule = initial_rule
 
     def compose(self) -> ComposeResult:
+        """Wrap the rule form inside a modal."""
         yield Vertical(
             RuleForm(id="rule_form", initial_rule=self.initial_rule),
             Static("Tab to navigate, Enter to submit, Esc to cancel."),
@@ -209,6 +213,7 @@ class ConfirmDialog(ModalScreen[bool]):
         self.message = message
 
     def compose(self) -> ComposeResult:
+        """Simple yes/no modal."""
         yield Vertical(
             Static(self.message),
             Static("[y] yes / [n] no"),
@@ -234,10 +239,12 @@ class RuleTable(Static):
         self.table = DataTable(zebra_stripes=True)
 
     def compose(self) -> ComposeResult:
+        """Create the rules data table with columns."""
         self.table.add_columns("ID", "Action", "Direction", "Protocol", "Port", "Iface", "Active")
         yield self.table
 
     def update_rules(self, rules: List[Rule]) -> None:
+        """Refresh table rows from the given rules list."""
         self.table.clear(columns=False)
         self._row_keys = []
         for rule in rules:
@@ -256,6 +263,7 @@ class RuleTable(Static):
             self.table.cursor_coordinate = (0, 0)
 
     def get_selected_rule_id(self) -> Optional[str]:
+        """Return the UUID string of the highlighted rule, or None."""
         coordinate = self.table.cursor_coordinate
         if coordinate is None:
             return None
@@ -265,4 +273,5 @@ class RuleTable(Static):
         return None
 
     def focus_table(self) -> None:
+        """Give focus to the underlying DataTable."""
         self.table.focus()

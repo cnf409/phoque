@@ -40,12 +40,14 @@ class FirewallApp(App):
         self.manager = FirewallManager(JsonDatabase.get_instance())
 
     def compose(self) -> ComposeResult:
+        """Layout main screen: banner, table, log, and dynamic help."""
         yield Static("phoque - firewall TUI", id="banner")
         yield RuleTable(id="rules_table")
         yield RichLog(id="log", highlight=False, markup=True, wrap=False)
         yield Static("", id="help", markup=False)
 
     def on_mount(self) -> None:
+        """Initialize state and focus."""
         self.refresh_rules()
         self.query_one(RuleTable).focus_table()
         self._log("Use [a]/[e]/[d]/[x]/[p]/[t]/[q]; navigate with arrow keys.")
@@ -56,6 +58,7 @@ class FirewallApp(App):
         self._update_help_text()
 
     def _update_help_text(self) -> None:
+        """Update shortcut footer with dynamic toggle-all label."""
         label = self._toggle_all_label()
         help_text = (
             f"Shortcuts: [a]dd, [e]dit, [d]elete, [x] toggle, [p] {label}, "
@@ -64,6 +67,7 @@ class FirewallApp(App):
         self.query_one("#help", Static).update(help_text)
 
     def _log(self, message: str, severity: str = "info") -> None:
+        """Write a colored line to the log panel."""
         colors = {
             "info": "sky_blue3",
             "warning": "yellow1",
@@ -75,13 +79,16 @@ class FirewallApp(App):
         log.write(f"[{color}]{escape(message)}[/{color}]")
 
     def action_add_rule(self) -> None:
+        """Open add-rule modal."""
         self._log("Add rule: ↑/↓ to pick, Tab to move, Enter to submit, Esc to cancel.", severity="info")
         self.push_screen(AddRuleScreen(), self._handle_rule_creation)
 
     def action_focus_table(self) -> None:
+        """Return focus to the rules table."""
         self.query_one(RuleTable).focus_table()
 
     def action_delete_rule(self) -> None:
+        """Prompt deletion for the selected rule."""
         table = self.query_one("#rules_table", RuleTable)
         selected = table.get_selected_rule_id()
         if not selected:
@@ -98,6 +105,7 @@ class FirewallApp(App):
         self.exit()
 
     def action_edit_rule(self) -> None:
+        """Open edit modal for the selected rule."""
         table = self.query_one("#rules_table", RuleTable)
         selected_id = table.get_selected_rule_id()
         if not selected_id:
@@ -110,6 +118,7 @@ class FirewallApp(App):
         self.push_screen(AddRuleScreen(initial_rule=rule), self._handle_rule_creation)
 
     def action_toggle_rule(self) -> None:
+        """Toggle a single rule active flag and apply immediately."""
         table = self.query_one("#rules_table", RuleTable)
         selected_id = table.get_selected_rule_id()
         if not selected_id:
@@ -133,6 +142,7 @@ class FirewallApp(App):
             self._log(f"Apply failed: {exc.stderr}", severity="error")
 
     def _handle_rule_creation(self, event: RuleForm.Submitted | None) -> None:
+        """Create or update a rule from the submitted form."""
         if event is None:
             return
         action_raw = event.action
@@ -204,6 +214,7 @@ class FirewallApp(App):
             )
 
     def _remove_rule(self, rule_id: str) -> None:
+        """Delete a rule by id and refresh UI."""
         removed = self.manager.remove_rule(rule_id)
         if removed:
             self.refresh_rules()
@@ -212,12 +223,14 @@ class FirewallApp(App):
             self._log("Rule not found", severity="warning")
 
     def _handle_delete_confirmation(self, confirmed: bool | None, rule_id: str) -> None:
+        """Callback after delete confirmation modal."""
         if confirmed:
             self._remove_rule(rule_id)
         else:
             self._log("Deletion cancelled", severity="info")
 
     def _apply_rules(self) -> None:
+        """Toggle all rules according to current state and apply on system."""
         if not self.manager.rules:
             self._log("No rules to toggle", severity="warning")
             return
@@ -252,6 +265,7 @@ class FirewallApp(App):
         self._log(f"All rules {action_label} and applied ({len(commands)} command(s))", severity="success")
 
     def _toggle_all_label(self) -> str:
+        """Return the appropriate label for the toggle-all shortcut."""
         if not self.manager.rules:
             return "toggle all"
         actives = [rule.active for rule in self.manager.rules]

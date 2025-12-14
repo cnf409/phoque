@@ -17,6 +17,7 @@ class JsonDatabase(IDatabaseService):
 
     @classmethod
     def get_instance(cls, file_path: Path | str | None = None) -> "JsonDatabase":
+        """Singleton accessor; optional custom path for tests."""
         target_path = Path(file_path) if file_path else None
         if cls._instance is None:
             cls._instance = cls(target_path or cls._default_path())
@@ -30,11 +31,13 @@ class JsonDatabase(IDatabaseService):
         return base_dir / "data" / "rules.json"
 
     def save(self, rules: List[Rule]) -> None:
+        """Persist rules to disk as JSON."""
         payload = [rule.to_dict() for rule in rules]
         with self.file_path.open("w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
 
     def load(self) -> List[Rule]:
+        """Load rules from disk; empty list on first run or parse error."""
         if not self.file_path.exists():
             return []
         try:

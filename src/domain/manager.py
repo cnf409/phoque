@@ -26,10 +26,12 @@ class FirewallManager:
         self.rules: List[Rule] = self.db.load()
 
     def add_rule(self, rule: Rule) -> None:
+        """Add a new rule and persist it."""
         self.rules.append(rule)
         self.db.save(self.rules)
 
     def update_rule(self, rule_id: str | UUID, new_rule: Rule) -> bool:
+        """Replace an existing rule while keeping its id/active flag."""
         normalized = str(rule_id)
         for idx, rule in enumerate(self.rules):
             if str(rule.id) == normalized:
@@ -41,6 +43,7 @@ class FirewallManager:
         return False
 
     def get_rule(self, rule_id: str | UUID) -> Optional[Rule]:
+        """Return a rule by id or None."""
         normalized = str(rule_id)
         for rule in self.rules:
             if str(rule.id) == normalized:
@@ -48,6 +51,7 @@ class FirewallManager:
         return None
 
     def remove_rule(self, rule_id: str | UUID, runner: Optional[Callable[[str], None]] = None) -> bool:
+        """De-apply and delete a rule; return True if removed."""
         normalized = str(rule_id)
         for idx, rule in enumerate(self.rules):
             if str(rule.id) == normalized:
@@ -63,6 +67,7 @@ class FirewallManager:
         execute: bool = True,
         runner: Optional[Callable[[str], None]] = None,
     ) -> List[str]:
+        """Apply all active rules; returns executed commands. If execute=False, dry-run."""
         commands = [rule.get_command() for rule in self.rules if rule.active]
         if not execute:
             return commands
@@ -79,6 +84,7 @@ class FirewallManager:
         runner: Optional[Callable[[str], None]] = None,
         ignore_errors: bool = False,
     ) -> None:
+        """Run a shell command or pass to injected runner."""
         if runner:
             runner(command)
             return
@@ -96,6 +102,7 @@ class FirewallManager:
         self,
         runner: Optional[Callable[[str], None]] = None,
     ) -> None:
+        """Delete previously tagged rules so apply starts from a clean slate."""
         for chain in ("INPUT", "OUTPUT", "FORWARD"):
             list_cmd = f"iptables -S {chain}"
             completed = subprocess.run(
@@ -120,6 +127,7 @@ class FirewallManager:
         rule: Rule,
         runner: Optional[Callable[[str], None]] = None,
     ) -> None:
+        """Remove a single rule from the system."""
         # Remove rule from all chains it could have been applied to.
         target_map = {
             "ALLOW": "ACCEPT",
