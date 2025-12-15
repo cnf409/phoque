@@ -1,5 +1,7 @@
 # phoque – keyboard-only TUI firewall (iptables)
 
+![phoque_logo.png](https://i.ibb.co/kRX8cP0/logo.png)
+
 Lightweight Textual TUI that drives iptables with a pure-keyboard workflow. Rules are tagged so a re-apply cleans previously applied rules.
 
 ## Features
