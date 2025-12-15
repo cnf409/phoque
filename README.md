@@ -1,6 +1,6 @@
 # phoque – keyboard-only TUI firewall (iptables)
 
-![phoque_logo.png](https://raw.githubusercontent.com/cnf409/phoque/refs/heads/main/logo.png)
+<img src="https://raw.githubusercontent.com/cnf409/phoque/refs/heads/main/logo.png" alt="phoque_logo" width="300"/>
 
 Lightweight Textual TUI that drives iptables with a pure-keyboard workflow. Rules are tagged so a re-apply cleans previously applied rules.
 
