@@ -1,4 +1,4 @@
-# phoque | seal-tight TUI firewall
+# phoque: the seal-tight TUI firewall
 
 <img src="https://raw.githubusercontent.com/cnf409/phoque/refs/heads/main/logo.png" alt="phoque logo" width="280"/>
 
