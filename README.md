@@ -8,7 +8,7 @@ Keyboard-only firewall that lets you add and toggle iptables rules without touch
 - Rules persisted in `data/rules.json`; each rule is tagged `phoque-<id>` on apply for easy cleanup.
 - Delete de-applies the rule; toggle-all flips every rule then reapplies.
 
-Note: the project is still evolving; expect frequent changes and new functionnalities !
+Note: school project focused on OOP and good programming practices. The project is still evolving; expect frequent changes and new functionalities.
 
 ## Prerequisites
 - Linux with iptables available.
