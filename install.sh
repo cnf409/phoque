@@ -32,7 +32,6 @@ cd "$INSTALL_DIR"
 
 # Check if running as root
 if [ "\$EUID" -ne 0 ]; then
-  echo "Phoque requires root privileges."
   exec sudo -E "$INSTALL_DIR/.venv/bin/python" "$INSTALL_DIR/src/domain/main.py" "\$@"
 else
   exec "$INSTALL_DIR/.venv/bin/python" "$INSTALL_DIR/src/domain/main.py" "\$@"
