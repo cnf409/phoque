@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import socket
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional, Tuple
 
 from rich.text import Text
 from textual import events
@@ -49,6 +49,10 @@ class RuleForm(Static):
     RuleForm Select, RuleForm Input {
         margin-top: 1;
     }
+    RuleForm #form_error {
+        color: red;
+        margin-top: 1;
+    }
     RuleForm #interface_options {
         height: 5;
         margin-top: 1;
@@ -86,6 +90,7 @@ class RuleForm(Static):
             if self.initial_rule.interface:
                 summary.append(f" [{self.initial_rule.interface}]", style="sky_blue3")
             yield Static(summary, classes="hint", markup=False)
+        yield Static("", id="form_error")
         yield OptionList(Option("Accept", "allow"), Option("Drop", "deny"), Option("Reject", "reject"), id="action")
         yield OptionList(
             Option(Direction.IN.value, Direction.IN.value),
@@ -125,9 +130,9 @@ class RuleForm(Static):
             self.action_cancel()
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        if getattr(event.input, "id", None) != "interface":
-            return
-        self._filter_interface_options(event.value)
+        self.set_error(None)
+        if getattr(event.input, "id", None) == "interface":
+            self._filter_interface_options(event.value)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         event.stop()
@@ -138,6 +143,7 @@ class RuleForm(Static):
 
     def action_submit(self) -> None:
         """Collect the current selections and emit a Submitted message."""
+        self.set_error(None)
         action_select = self.query_one("#action", OptionList)
         direction_select = self.query_one("#direction", OptionList)
         protocol_select = self.query_one("#protocol", OptionList)
@@ -200,6 +206,7 @@ class RuleForm(Static):
         iface_input = self.query_one("#interface", Input)
         iface_input.value = defaults["interface"]
         self._filter_interface_options(iface_input.value)
+        self.set_error(None)
 
     def _load_interfaces(self) -> List[str]:
         sysfs = Path("/sys/class/net")
@@ -243,11 +250,20 @@ class RuleForm(Static):
         iface_input.focus()
         return True
 
+    def set_error(self, message: Optional[str]) -> None:
+        error = self.query_one("#form_error", Static)
+        error.update(message or "")
+
 
 class AddRuleScreen(ModalScreen[Optional[RuleForm.Submitted]]):
-    def __init__(self, initial_rule: Optional[Rule] = None) -> None:
+    def __init__(
+        self,
+        initial_rule: Optional[Rule] = None,
+        submit_handler: Optional[Callable[[RuleForm.Submitted], Tuple[bool, Optional[str]]]] = None,
+    ) -> None:
         super().__init__()
         self.initial_rule = initial_rule
+        self.submit_handler = submit_handler
 
     def compose(self) -> ComposeResult:
         """Wrap the rule form inside a modal."""
@@ -260,6 +276,13 @@ class AddRuleScreen(ModalScreen[Optional[RuleForm.Submitted]]):
         self.set_focus(self.query_one(RuleForm))
 
     def on_rule_form_submitted(self, event: RuleForm.Submitted) -> None:
+        if self.submit_handler:
+            success, error = self.submit_handler(event)
+            if success:
+                self.dismiss(event)
+            else:
+                self.query_one(RuleForm).set_error(error or "Invalid values")
+            return
         self.dismiss(event)
 
     def on_rule_form_cancelled(self, _: RuleForm.Cancelled) -> None:

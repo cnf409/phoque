@@ -81,7 +81,7 @@ class FirewallApp(App):
     def action_add_rule(self) -> None:
         """Open add-rule modal."""
         self._log("Add rule: ↑/↓ to pick, Tab to move, Enter to submit, Esc to cancel.", severity="info")
-        self.push_screen(AddRuleScreen(), self._handle_rule_creation)
+        self.push_screen(AddRuleScreen(submit_handler=self._handle_rule_creation))
 
     def action_focus_table(self) -> None:
         """Return focus to the rules table."""
@@ -115,7 +115,7 @@ class FirewallApp(App):
         if not rule:
             self._log("Rule not found", severity="warning")
             return
-        self.push_screen(AddRuleScreen(initial_rule=rule), self._handle_rule_creation)
+        self.push_screen(AddRuleScreen(initial_rule=rule, submit_handler=self._handle_rule_creation))
 
     def action_toggle_rule(self) -> None:
         """Toggle a single rule active flag and apply immediately."""
@@ -141,10 +141,8 @@ class FirewallApp(App):
         except CommandExecutionError as exc:
             self._log(f"Apply failed: {exc.stderr}", severity="error")
 
-    def _handle_rule_creation(self, event: RuleForm.Submitted | None) -> None:
+    def _handle_rule_creation(self, event: RuleForm.Submitted) -> tuple[bool, str | None]:
         """Create or update a rule from the submitted form."""
-        if event is None:
-            return
         action_raw = event.action
         direction_raw = event.direction.value
         protocol_raw = event.protocol.value
@@ -158,25 +156,29 @@ class FirewallApp(App):
         }
         rule_cls = action_map.get(action_raw.lower())
         if not rule_cls:
-            self._log("Unknown action (allow/deny/reject)", severity="warning")
-            return
+            message = "Unknown action (allow/deny/reject)"
+            self._log(message, severity="warning")
+            return False, message
 
         try:
             direction = Direction(direction_raw.upper())
         except ValueError:
-            self._log("Invalid direction (in/out/forward)", severity="warning")
-            return
+            message = "Invalid direction (in/out/forward)"
+            self._log(message, severity="warning")
+            return False, message
 
         try:
             protocol = Protocol(protocol_raw.upper())
         except ValueError:
-            self._log("Invalid protocol (tcp/udp/icmp)", severity="warning")
-            return
+            message = "Invalid protocol (tcp/udp/icmp)"
+            self._log(message, severity="warning")
+            return False, message
 
         if protocol != Protocol.ICMP:
             if port_raw is None:
-                self._log("Port required for TCP/UDP", severity="warning")
-                return
+                message = "Port required for TCP/UDP"
+                self._log(message, severity="warning")
+                return False, message
             port = port_raw
         else:
             port = None
@@ -184,8 +186,9 @@ class FirewallApp(App):
         try:
             rule = rule_cls(direction=direction, protocol=protocol, port=port, interface=interface_raw)
         except ValueError as exc:
-            self._log(str(exc), severity="warning")
-            return
+            message = str(exc)
+            self._log(message, severity="warning")
+            return False, message
 
         if event.rule_id:
             updated = self.manager.update_rule(event.rule_id, rule)
@@ -197,8 +200,11 @@ class FirewallApp(App):
                     f"Updated: {rule.type_name} {rule.direction.value} {rule.protocol.value}{port_part}{iface_part}",
                     severity="success",
                 )
+                return True, None
             else:
-                self._log("Rule not found for update", severity="warning")
+                message = "Rule not found for update"
+                self._log(message, severity="warning")
+                return False, message
         else:
             # New rules start inactive; let user toggle/apply explicitly.
             rule.active = False
@@ -212,6 +218,7 @@ class FirewallApp(App):
                 + " (inactive by default)",
                 severity="info",
             )
+            return True, None
 
     def _remove_rule(self, rule_id: str) -> None:
         """Delete a rule by id and refresh UI."""
