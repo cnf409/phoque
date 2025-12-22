@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import socket
+from pathlib import Path
 from typing import List, Optional
 
 from rich.text import Text
@@ -47,11 +49,16 @@ class RuleForm(Static):
     RuleForm Select, RuleForm Input {
         margin-top: 1;
     }
+    RuleForm #interface_options {
+        height: 5;
+        margin-top: 1;
+    }
     """
 
     def __init__(self, initial_rule: Optional[Rule] = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self.initial_rule = initial_rule
+        self._interfaces = self._load_interfaces()
 
     def compose(self) -> ComposeResult:
         """Build the add/edit form with action/direction/protocol/port/interface controls."""
@@ -93,7 +100,8 @@ class RuleForm(Static):
             id="protocol",
         )
         yield Input(placeholder="Port (empty for ICMP)", id="port")
-        yield Input(placeholder="Interface (optional, e.g. eth0)", id="interface")
+        yield Input(placeholder="Interface (optional, type to filter)", id="interface")
+        yield OptionList(*[Option(name, name) for name in self._interfaces], id="interface_options")
 
     def on_mount(self) -> None:
         self._highlight_defaults()
@@ -105,11 +113,21 @@ class RuleForm(Static):
     def on_key(self, event: events.Key) -> None:
         """Handle Enter/Esc manually to avoid relying on focus state."""
         if event.key == "enter":
+            focused = getattr(self.app, "focused", None)
+            if focused and getattr(focused, "id", None) == "interface_options":
+                if self._accept_interface_highlight():
+                    event.stop()
+                    return
             event.stop()
             self.action_submit()
         elif event.key == "escape":
             event.stop()
             self.action_cancel()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if getattr(event.input, "id", None) != "interface":
+            return
+        self._filter_interface_options(event.value)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         event.stop()
@@ -181,6 +199,49 @@ class RuleForm(Static):
         port_input.value = defaults["port"]
         iface_input = self.query_one("#interface", Input)
         iface_input.value = defaults["interface"]
+        self._filter_interface_options(iface_input.value)
+
+    def _load_interfaces(self) -> List[str]:
+        sysfs = Path("/sys/class/net")
+        if sysfs.exists():
+            names = [path.name for path in sysfs.iterdir() if path.is_dir()]
+        else:
+            try:
+                names = [name for _, name in socket.if_nameindex()]
+            except OSError:
+                names = []
+        return sorted({name for name in names if name}, key=str.lower)
+
+    def _filter_interface_options(self, query: str) -> None:
+        option_list = self.query_one("#interface_options", OptionList)
+        previous = option_list.highlighted_option.id if option_list.highlighted_option else None
+        needle = query.strip().lower()
+        if needle:
+            matches = [name for name in self._interfaces if needle in name.lower()]
+        else:
+            matches = list(self._interfaces)
+
+        option_list.clear_options()
+        for name in matches:
+            option_list.add_option(Option(name, name))
+
+        if not matches:
+            option_list.highlighted = None
+            return
+        if previous and previous in matches:
+            option_list.highlighted = matches.index(previous)
+        else:
+            option_list.highlighted = 0
+
+    def _accept_interface_highlight(self) -> bool:
+        option_list = self.query_one("#interface_options", OptionList)
+        highlighted = option_list.highlighted_option
+        if highlighted is None:
+            return False
+        iface_input = self.query_one("#interface", Input)
+        iface_input.value = str(highlighted.id)
+        iface_input.focus()
+        return True
 
 
 class AddRuleScreen(ModalScreen[Optional[RuleForm.Submitted]]):
