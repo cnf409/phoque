@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
+import re
+import socket
 from typing import Dict, Optional, Type, Union
 from uuid import UUID, uuid4
 
 from .types import Direction, Protocol
+
+_INTERFACE_PATTERN = re.compile(r"^[A-Za-z0-9_.:-]+$")
 
 
 @dataclass
@@ -19,7 +25,7 @@ class Rule(ABC):
 
     def __post_init__(self) -> None:
         if self.interface is not None:
-            self.interface = self.interface.strip() or None
+            self.interface = self._normalize_interface(self.interface)
         if self.protocol != Protocol.ICMP:
             if self.port is None:
                 raise ValueError("Port is required for TCP and UDP rules")
@@ -124,6 +130,30 @@ class Rule(ABC):
 
     def _format_port_for_cli(self, port: str) -> str:
         return port.replace("-", ":")
+
+    def _normalize_interface(self, interface: str) -> Optional[str]:
+        value = interface.strip()
+        if not value:
+            return None
+        if not _INTERFACE_PATTERN.match(value):
+            raise ValueError("Interface name contains invalid characters")
+        known = self._system_interfaces()
+        if known and value not in known:
+            raise ValueError(f"Unknown interface: {value}")
+        return value
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _system_interfaces() -> tuple[str, ...]:
+        sysfs = Path("/sys/class/net")
+        if sysfs.exists():
+            names = [path.name for path in sysfs.iterdir() if path.is_dir()]
+        else:
+            try:
+                names = [name for _, name in socket.if_nameindex()]
+            except OSError:
+                names = []
+        return tuple(sorted({name for name in names if name}, key=str.lower))
 
 
 class AllowRule(Rule):

@@ -46,4 +46,10 @@ class JsonDatabase(IDatabaseService):
         except json.JSONDecodeError:
             return []
 
-        return [Rule.from_dict(item) for item in raw]
+        rules: List[Rule] = []
+        for item in raw:
+            try:
+                rules.append(Rule.from_dict(item))
+            except (ValueError, KeyError, TypeError):
+                continue
+        return rules
