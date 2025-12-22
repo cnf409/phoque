@@ -123,6 +123,10 @@ class RuleForm(Static):
                 if self._accept_interface_highlight():
                     event.stop()
                     return
+            if focused and getattr(focused, "id", None) == "interface":
+                if self._fill_interface_from_suggestion():
+                    event.stop()
+                    return
             event.stop()
             self.action_submit()
         elif event.key == "escape":
@@ -135,6 +139,10 @@ class RuleForm(Static):
             self._filter_interface_options(event.value)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        if getattr(event.input, "id", None) == "interface":
+            if self._fill_interface_from_suggestion():
+                event.stop()
+                return
         event.stop()
         self.action_submit()
 
@@ -247,7 +255,25 @@ class RuleForm(Static):
             return False
         iface_input = self.query_one("#interface", Input)
         iface_input.value = str(highlighted.id)
+        if hasattr(iface_input, "cursor_position"):
+            iface_input.cursor_position = len(iface_input.value)
         iface_input.focus()
+        return True
+
+    def _fill_interface_from_suggestion(self) -> bool:
+        option_list = self.query_one("#interface_options", OptionList)
+        highlighted = option_list.highlighted_option
+        if highlighted is None and option_list.option_count:
+            highlighted = option_list.get_option_at_index(0)
+        if highlighted is None:
+            return False
+        iface_input = self.query_one("#interface", Input)
+        suggestion = str(highlighted.id)
+        if iface_input.value.strip() == suggestion:
+            return False
+        iface_input.value = suggestion
+        if hasattr(iface_input, "cursor_position"):
+            iface_input.cursor_position = len(suggestion)
         return True
 
     def set_error(self, message: Optional[str]) -> None:
