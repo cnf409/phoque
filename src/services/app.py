@@ -94,8 +94,12 @@ class FirewallApp(App):
         if not selected:
             self._log("No rule selected", severity="warning")
             return
-        msg = f"Delete rule {selected}? [y/n]"
-        self.push_screen(ConfirmDialog(msg), lambda res: self._handle_delete_confirmation(res, selected))
+        rule = self.manager.get_rule(selected)
+        if not rule:
+            self._log("Rule not found", severity="warning")
+            return
+        msg = "Confirm deletion of the following rule?"
+        self.push_screen(ConfirmDialog(msg, rule=rule), lambda res: self._handle_delete_confirmation(res, selected))
 
     def action_apply_rules(self) -> None:
         self._apply_rules()
